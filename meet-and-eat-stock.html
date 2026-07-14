@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meet &amp; Eat — Stock Ledger</title>
+
+<!-- Works fully offline: installs as a home-screen app, no internet calls at all -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="M&amp;E Stock">
+<meta name="theme-color" content="#1c211f">
+
+<style>
+  :root{
+    --ink:#1c211f;
+    --ink-soft:#2a312e;
+    --paper:#f3efe2;
+    --paper-dim:#e7e1cf;
+    --steel:#8a9a97;
+    --steel-dark:#5c6b68;
+    --amber:#d9a13e;
+    --brick:#b8452f;
+    --leaf:#4c7a5e;
+    --font-display:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mono);}
+  h1,h2,h3{font-family:var(--font-display);margin:0;}
+
+  /* ---------- Header / board ---------- */
+  header.board{
+    background:var(--ink);
+    border-bottom:3px solid var(--amber);
+    padding:20px 24px 0 24px;
+  }
+  .board-left{display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+  .logo-slot{
+    width:64px;height:64px;border:2px dashed var(--steel);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    flex-shrink:0;overflow:hidden;background:var(--ink-soft);
+  }
+  .logo-slot img{width:100%;height:100%;object-fit:cover;}
+  .logo-slot span{font-size:10px;color:var(--steel);letter-spacing:1px;text-align:center;}
+  .board-title h1{font-size:28px;letter-spacing:0.5px;}
+  .board-title .tagline{margin:4px 0 0 0;font-size:12px;color:var(--steel);letter-spacing:0.5px;}
+
+  nav.rail{display:flex;gap:2px;overflow-x:auto;}
+  .tab{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:0.5px;
+    background:var(--ink-soft);color:var(--steel);border:none;
+    padding:10px 16px;cursor:pointer;white-space:nowrap;
+    clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 70%);
+    transition:background .15s, color .15s;
+  }
+  .tab:hover{color:var(--paper);}
+  .tab.active{background:var(--paper);color:var(--ink);font-weight:600;}
+
+  /* ---------- Layout ---------- */
+  main{max-width:1100px;margin:0 auto;padding:28px 20px 60px 20px;}
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .2s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  .panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  .panel-head h2{color:var(--paper);}
+  .panel-head label{font-size:12px;color:var(--steel);display:flex;align-items:center;gap:6px;}
+
+  .grid-2{display:grid;grid-template-columns:320px 1fr;gap:28px;}
+  @media (max-width:800px){.grid-2{grid-template-columns:1fr;}}
+
+  h2{color:var(--paper);font-size:18px;margin-bottom:14px;}
+  h3{color:var(--paper);font-size:14px;margin:22px 0 10px 0;}
+
+  /* ---------- Ticket cards ---------- */
+  .ticket{
+    background:var(--paper);color:var(--ink);border-radius:4px;
+    padding:18px;position:relative;
+  }
+  .form-ticket label{display:block;font-size:11px;color:var(--ink-soft);letter-spacing:0.5px;margin-bottom:12px;text-transform:uppercase;}
+  .form-ticket input,.form-ticket select{
+    display:block;width:100%;margin-top:5px;padding:8px 10px;font-family:var(--font-mono);
+    font-size:14px;border:1px solid var(--steel);border-radius:3px;background:#fff;color:var(--ink);
+  }
+
+  .btn{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:0.5px;font-weight:600;
+    padding:10px 18px;border-radius:3px;border:none;cursor:pointer;
+  }
+  .btn.primary{background:var(--amber);color:var(--ink);}
+  .btn.primary:hover{background:#e7ad4c;}
+  .btn.danger{background:var(--brick);color:var(--paper);margin-top:14px;}
+  .btn.danger:hover{background:#c9573f;}
+  .btn.ghost{background:transparent;border:1px solid var(--steel);color:var(--paper);}
+  .btn.ghost:hover{border-color:var(--paper);}
+  .link-btn{background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-family:var(--font-mono);font-size:12px;}
+
+  .ticket-list{display:flex;flex-direction:column;gap:10px;}
+  .item-card{
+    background:var(--paper);color:var(--ink);border-radius:4px;padding:12px 14px;
+    display:flex;align-items:center;gap:14px;
+  }
+  .item-card .meta{flex:1;min-width:0;}
+  .item-card .meta .name{font-family:var(--font-display);font-weight:600;font-size:14px;}
+  .item-card .meta .sub{font-size:11px;color:var(--steel-dark);margin-top:2px;}
+  .item-card .barcode-wrap{text-align:center;flex-shrink:0;}
+  .item-card .code-txt{font-size:9px;letter-spacing:2px;margin-top:2px;color:var(--ink-soft);}
+  .barcode{width:70px;height:28px;}
+  .item-card .del{background:none;border:none;color:var(--brick);cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;}
+  .cat-tag{
+    display:inline-block;font-size:9px;letter-spacing:1px;text-transform:uppercase;
+    padding:2px 6px;border-radius:2px;background:var(--paper-dim);color:var(--ink-soft);margin-top:4px;
+  }
+
+  /* ---------- Tables ---------- */
+  table.ledger{width:100%;border-collapse:collapse;background:var(--ink-soft);border-radius:4px;overflow:hidden;font-size:13px;}
+  table.ledger th{
+    text-align:left;font-family:var(--font-display);font-size:11px;letter-spacing:0.5px;text-transform:uppercase;
+    color:var(--steel);padding:10px 12px;border-bottom:2px solid var(--ink);
+  }
+  table.ledger td{padding:10px 12px;border-bottom:1px solid var(--ink);color:var(--paper);}
+  table.ledger tr:last-child td{border-bottom:none;}
+  table.ledger input[type=number]{
+    width:90px;padding:6px 8px;font-family:var(--font-mono);background:var(--paper);
+    color:var(--ink);border:1px solid var(--steel);border-radius:3px;
+  }
+  .status-ok{color:var(--leaf);font-weight:600;}
+  .status-bad{color:var(--brick);font-weight:600;}
+  .status-warn{color:var(--amber);font-weight:600;}
+  .status-none{color:var(--steel);}
+
+  .hint{font-size:12px;color:var(--steel);margin-top:10px;}
+  .history{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
+  .history li{background:var(--ink-soft);padding:10px 14px;border-radius:4px;font-size:12px;color:var(--paper);}
+
+  footer{border-top:1px solid var(--ink-soft);padding:16px 20px;text-align:center;}
+  footer p{font-size:11px;color:var(--steel);max-width:700px;margin:0 auto;}
+  .empty{color:var(--steel);font-size:13px;padding:14px 0;}
+</style>
+</head>
+<body>
+
+<header class="board">
+  <div class="board-left">
+    <label class="logo-slot" id="logoSlot">
+      <input type="file" id="logoInput" accept="image/*" hidden>
+      <img id="logoImg" hidden alt="Restaurant logo">
+      <span id="logoPlaceholder">+ LOGO</span>
+    </label>
+    <div class="board-title">
+      <h1>Meet &amp; Eat</h1>
+      <p class="tagline">Nightly Stock Ledger — Crockery · Glass · Linen · Furniture</p>
+    </div>
+  </div>
+  <nav class="rail" id="tabRail">
+    <button class="tab active" data-tab="setup">01 Setup</button>
+    <button class="tab" data-tab="nightly">02 Nightly Count</button>
+    <button class="tab" data-tab="restock">03 Restock</button>
+    <button class="tab" data-tab="dashboard">04 Dashboard</button>
+    <button class="tab" data-tab="monthend">05 Month-End</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- SETUP -->
+  <section class="panel active" id="panel-setup">
+    <div class="grid-2">
+      <form id="itemForm" class="ticket form-ticket">
+        <h2>Add Stock Item</h2>
+        <label>Item name
+          <input type="text" id="itemName" placeholder="e.g. Dinner Plate 10in" required>
+        </label>
+        <label>Category
+          <select id="itemCategory">
+            <option>Crockery</option>
+            <option>Glassware</option>
+            <option>Cutlery</option>
+            <option>Linen</option>
+            <option>Furniture</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label>Unit
+          <input type="text" id="itemUnit" value="pcs" required>
+        </label>
+        <label>Opening stock (count it right now)
+          <input type="number" id="itemOpening" min="0" value="0" required>
+        </label>
+        <button type="submit" class="btn primary">Add item</button>
+      </form>
+      <div>
+        <h2>Item register</h2>
+        <div class="ticket-list" id="itemsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NIGHTLY -->
+  <section class="panel" id="panel-nightly">
+    <div class="panel-head">
+      <h2>Nightly Stock Count</h2>
+      <label>Date <input type="date" id="nightlyDate"></label>
+    </div>
+    <table class="ledger" id="nightlyTable">
+      <thead><tr><th>Item</th><th>Code</th><th>Expected</th><th>Counted tonight</th><th>Live diff</th></tr></thead>
+      <tbody id="nightlyBody"></tbody>
+    </table>
+    <button class="btn primary" id="saveNightly" style="margin-top:16px;">Save tonight's count</button>
+    <p class="hint" id="nightlyMsg"></p>
+  </section>
+
+  <!-- RESTOCK -->
+  <section class="panel" id="panel-restock">
+    <div class="grid-2">
+      <form id="restockForm" class="ticket form-ticket">
+        <h2>Log a Purchase</h2>
+        <label>Item
+          <select id="restockItem"></select>
+        </label>
+        <label>Quantity added
+          <input type="number" id="restockQty" min="1" value="1" required>
+        </label>
+        <label>Date
+          <input type="date" id="restockDate">
+        </label>
+        <label>Note (optional)
+          <input type="text" id="restockNote" placeholder="e.g. Supplier invoice #221">
+        </label>
+        <button type="submit" class="btn primary">Log purchase</button>
+      </form>
+      <div>
+        <h2>Purchase log</h2>
+        <table class="ledger">
+          <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Note</th><th></th></tr></thead>
+          <tbody id="purchaseBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="panel" id="panel-dashboard">
+    <div class="panel-head">
+      <h2>Live Dashboard</h2>
+      <button class="btn ghost" id="refreshDash">Refresh</button>
+    </div>
+    <table class="ledger">
+      <thead><tr><th>Item</th><th>Code</th><th>Expected</th><th>Last count</th><th>Counted on</th><th>Status</th></tr></thead>
+      <tbody id="dashBody"></tbody>
+    </table>
+  </section>
+
+  <!-- MONTH END -->
+  <section class="panel" id="panel-monthend">
+    <div class="panel-head">
+      <h2>Month-End Shortage Report</h2>
+      <label>Month <input type="month" id="monthPicker"></label>
+      <button class="btn ghost" id="exportCsv">Export CSV</button>
+    </div>
+    <table class="ledger">
+      <thead><tr><th>Item</th><th>Opening</th><th>Purchased</th><th>Expected</th><th>Last count</th><th>Shortage</th></tr></thead>
+      <tbody id="monthBody"></tbody>
+    </table>
+    <button class="btn danger" id="closeMonthBtn">Close month &amp; reset baseline</button>
+    <p class="hint">Closing writes off this month's shortage and starts next month's baseline from what's actually on the shelf. There's no undo button — export the CSV first if you want a paper trail.</p>
+    <h3>Closure history</h3>
+    <ul class="history" id="closureHistory"></ul>
+  </section>
+
+</main>
+
+<footer>
+  <p>Data lives only in this browser's local storage — no server, no sync between devices. Same device, same browser only. Export CSV before clearing your cache or switching phones.
+  <br><button class="link-btn" id="resetAll">Reset all data</button></p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  const STORAGE_KEY = "meetEatStockV1";
+
+  function defaultState(){
+    return { logo:null, nextCode:1, items:[], purchases:[], counts:[], closures:[] };
+  }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      return Object.assign(defaultState(), parsed);
+    }catch(e){ return defaultState(); }
+  }
+  let state = loadState();
+  function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function thisMonthStr(){ return todayStr().slice(0,7); }
+  function monthRange(monthStr){
+    const [y,m] = monthStr.split("-").map(Number);
+    const start = monthStr + "-01";
+    const lastDay = new Date(y, m, 0).getDate();
+    const end = monthStr + "-" + String(lastDay).padStart(2,"0");
+    return [start, end];
+  }
+  function nextDay(dateStr){
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0,10);
+  }
+  function fmtNum(n){ return Number(n).toLocaleString(); }
+  function esc(s){ const d=document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function getItem(id){ return state.items.find(i => i.id === id); }
+
+  function purchasedBetween(itemId, fromDate, toDate){
+    return state.purchases
+      .filter(p => p.itemId === itemId && p.date >= fromDate && p.date <= toDate)
+      .reduce((sum,p) => sum + Number(p.qty), 0);
+  }
+  function expectedStock(item, uptoDate){
+    return Number(item.openingQty) + purchasedBetween(item.id, item.openingDate, uptoDate);
+  }
+  function latestCountUpTo(itemId, uptoDate){
+    const list = state.counts.filter(c => c.itemId === itemId && c.date <= uptoDate);
+    if(list.length === 0) return null;
+    list.sort((a,b) => a.date < b.date ? 1 : -1);
+    return list[0];
+  }
+  function countOnDate(itemId, date){
+    return state.counts.find(c => c.itemId === itemId && c.date === date) || null;
+  }
+
+  function barcodeSVG(code){
+    let bars = "";
+    let x = 2;
+    for(let i=0;i<code.length;i++){
+      const c = code.charCodeAt(i);
+      const w = (c % 3) + 1;
+      if(i % 2 === 0){
+        bars += '<rect x="' + x + '" y="0" width="' + w + '" height="30" fill="#1c211f"/>';
+      }
+      x += w + 2;
+    }
+    return '<svg class="barcode" viewBox="0 0 ' + (x+2) + ' 30" preserveAspectRatio="none">' + bars + '</svg>';
+  }
+
+  /* ---------------- Tabs ---------------- */
+  document.getElementById("tabRail").addEventListener("click", function(e){
+    const btn = e.target.closest(".tab");
+    if(!btn) return;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+    if(btn.dataset.tab === "nightly") renderNightly();
+    if(btn.dataset.tab === "restock") renderRestock();
+    if(btn.dataset.tab === "dashboard") renderDashboard();
+    if(btn.dataset.tab === "monthend") renderMonthEnd();
+  });
+
+  /* ---------------- Logo ---------------- */
+  const logoInput = document.getElementById("logoInput");
+  const logoImg = document.getElementById("logoImg");
+  const logoPlaceholder = document.getElementById("logoPlaceholder");
+  document.getElementById("logoSlot").addEventListener("click", function(){ logoInput.click(); });
+  logoInput.addEventListener("change", function(){
+    const file = logoInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      state.logo = reader.result;
+      persist();
+      renderLogo();
+    };
+    reader.readAsDataURL(file);
+  });
+  function renderLogo(){
+    if(state.logo){
+      logoImg.src = state.logo;
+      logoImg.hidden = false;
+      logoPlaceholder.hidden = true;
+    }else{
+      logoImg.hidden = true;
+      logoPlaceholder.hidden = false;
+    }
+  }
+
+  /* ---------------- Setup: items ---------------- */
+  const itemForm = document.getElementById("itemForm");
+  itemForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    const name = document.getElementById("itemName").value.trim();
+    if(!name) return;
+    const opening = Number(document.getElementById("itemOpening").value) || 0;
+    const item = {
+      id: uid(),
+      name: name,
+      category: document.getElementById("itemCategory").value,
+      unit: document.getElementById("itemUnit").value.trim() || "pcs",
+      code: "ME-" + String(state.nextCode).padStart(3,"0"),
+      openingQty: opening,
+      openingDate: todayStr(),
+      createdAt: todayStr()
+    };
+    state.nextCode++;
+    state.items.push(item);
+    persist();
+    itemForm.reset();
+    document.getElementById("itemUnit").value = "pcs";
+    document.getElementById("itemOpening").value = "0";
+    renderAll();
+  });
+
+  function renderItemsList(){
+    const wrap = document.getElementById("itemsList");
+    if(state.items.length === 0){
+      wrap.innerHTML = '<p class="empty">No items yet. Add your first item on the left — plates, glasses, napkins, chairs, whatever you count.</p>';
+      return;
+    }
+    wrap.innerHTML = state.items.map(function(item){
+      return '<div class="item-card" data-id="' + item.id + '">' +
+        '<div class="meta">' +
+          '<div class="name">' + esc(item.name) + '</div>' +
+          '<div class="sub">' + esc(item.unit) + ' · opening ' + fmtNum(item.openingQty) + ' on ' + item.openingDate + '</div>' +
+          '<span class="cat-tag">' + esc(item.category) + '</span>' +
+        '</div>' +
+        '<div class="barcode-wrap">' + barcodeSVG(item.code) + '<div class="code-txt">' + item.code + '</div></div>' +
+        '<button class="del" title="Delete item" data-del="' + item.id + '">&times;</button>' +
+      '</div>';
+    }).join("");
+  }
+  document.getElementById("itemsList").addEventListener("click", function(e){
+    const btn = e.target.closest("[data-del]");
+    if(!btn) return;
+    const id = btn.dataset.del;
+    const item = getItem(id);
+    if(!confirm('Delete "' + item.name + '"? This also removes its count and purchase history. Cannot be undone.')) return;
+    state.items = state.items.filter(i => i.id !== id);
+    state.counts = state.counts.filter(c => c.itemId !== id);
+    state.purchases = state.purchases.filter(p => p.itemId !== id);
+    persist();
+    renderAll();
+  });
+
+  /* ---------------- Nightly count ---------------- */
+  const nightlyDate = document.getElementById("nightlyDate");
+  nightlyDate.value = todayStr();
+  nightlyDate.addEventListener("change", renderNightly);
+
+  function renderNightly(){
+    const body = document.getElementById("nightlyBody");
+    const date = nightlyDate.value || todayStr();
+    if(state.items.length === 0){
+      body.innerHTML = '<tr><td colspan="5" class="empty">Add items in Setup first.</td></tr>';
+      return;
+    }
+    body.innerHTML = state.items.map(function(item){
+      const expected = expectedStock(item, date);
+      const existing = countOnDate(item.id, date);
+      const val = existing ? existing.qty : "";
+      return '<tr data-item="' + item.id + '">' +
+        '<td>' + esc(item.name) + '</td>' +
+        '<td>' + item.code + '</td>' +
+        '<td>' + fmtNum(expected) + '</td>' +
+        '<td><input type="number" min="0" class="count-input" value="' + val + '" placeholder="e.g. ' + expected + '"></td>' +
+        '<td class="diff-cell">' + (existing !== null ? fmtNum(expected - existing.qty) : "—") + '</td>' +
+      '</tr>';
+    }).join("");
+
+    body.querySelectorAll(".count-input").forEach(function(input){
+      input.addEventListener("input", function(){
+        const row = input.closest("tr");
+        const itemId = row.dataset.item;
+        const item = getItem(itemId);
+        const expected = expectedStock(item, date);
+        const diffCell = row.querySelector(".diff-cell");
+        if(input.value === ""){ diffCell.textContent = "—"; return; }
+        diffCell.textContent = fmtNum(expected - Number(input.value));
+      });
+    });
+  }
+
+  document.getElementById("saveNightly").addEventListener("click", function(){
+    const date = nightlyDate.value || todayStr();
+    const rows = document.querySelectorAll("#nightlyBody tr[data-item]");
+    let savedCount = 0;
+    rows.forEach(function(row){
+      const input = row.querySelector(".count-input");
+      if(input.value === "" || Number(input.value) < 0) return;
+      const itemId = row.dataset.item;
+      const qty = Number(input.value);
+      const existingIdx = state.counts.findIndex(c => c.itemId === itemId && c.date === date);
+      if(existingIdx >= 0){
+        state.counts[existingIdx].qty = qty;
+      }else{
+        state.counts.push({ id: uid(), itemId: itemId, date: date, qty: qty });
+      }
+      savedCount++;
+    });
+    persist();
+    renderNightly();
+    const msg = document.getElementById("nightlyMsg");
+    msg.textContent = savedCount + " item(s) saved for " + date + ".";
+    setTimeout(function(){ msg.textContent = ""; }, 4000);
+  });
+
+  /* ---------------- Restock ---------------- */
+  const restockDate = document.getElementById("restockDate");
+  restockDate.value = todayStr();
+  const restockItemSelect = document.getElementById("restockItem");
+
+  function renderRestockItemOptions(){
+    if(state.items.length === 0){
+      restockItemSelect.innerHTML = '<option value="">No items yet</option>';
+      return;
+    }
+    restockItemSelect.innerHTML = state.items.map(function(item){
+      return '<option value="' + item.id + '">' + esc(item.name) + ' (' + item.code + ')</option>';
+    }).join("");
+  }
+
+  document.getElementById("restockForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    const itemId = restockItemSelect.value;
+    if(!itemId) { alert("Add an item in Setup first."); return; }
+    const qty = Number(document.getElementById("restockQty").value);
+    if(!qty || qty <= 0) return;
+    state.purchases.push({
+      id: uid(),
+      itemId: itemId,
+      date: restockDate.value || todayStr(),
+      qty: qty,
+      note: document.getElementById("restockNote").value.trim()
+    });
+    persist();
+    document.getElementById("restockQty").value = "1";
+    document.getElementById("restockNote").value = "";
+    renderRestock();
+  });
+
+  function renderRestock(){
+    renderRestockItemOptions();
+    const body = document.getElementById("purchaseBody");
+    if(state.purchases.length === 0){
+      body.innerHTML = '<tr><td colspan="5" class="empty">No purchases logged yet.</td></tr>';
+      return;
+    }
+    const sorted = state.purchases.slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+    body.innerHTML = sorted.map(function(p){
+      const item = getItem(p.itemId);
+      const itemName = item ? item.name : "(deleted item)";
+      return '<tr>' +
+        '<td>' + p.date + '</td>' +
+        '<td>' + esc(itemName) + '</td>' +
+        '<td>+' + fmtNum(p.qty) + '</td>' +
+        '<td>' + esc(p.note || "—") + '</td>' +
+        '<td><button class="del" data-delpurchase="' + p.id + '" title="Remove">&times;</button></td>' +
+      '</tr>';
+    }).join("");
+  }
+  document.getElementById("purchaseBody").addEventListener("click", function(e){
+    const btn = e.target.closest("[data-delpurchase]");
+    if(!btn) return;
+    if(!confirm("Remove this purchase entry?")) return;
+    state.purchases = state.purchases.filter(p => p.id !== btn.dataset.delpurchase);
+    persist();
+    renderRestock();
+  });
+
+  /* ---------------- Dashboard ---------------- */
+  document.getElementById("refreshDash").addEventListener("click", renderDashboard);
+  function renderDashboard(){
+    const body = document.getElementById("dashBody");
+    if(state.items.length === 0){
+      body.innerHTML = '<tr><td colspan="6" class="empty">Add items in Setup first.</td></tr>';
+      return;
+    }
+    const today = todayStr();
+    body.innerHTML = state.items.map(function(item){
+      const expected = expectedStock(item, today);
+      const rec = latestCountUpTo(item.id, today);
+      let statusHtml;
+      if(!rec){
+        statusHtml = '<span class="status-none">Not counted yet</span>';
+      }else{
+        const diff = expected - rec.qty;
+        if(diff > 0) statusHtml = '<span class="status-bad">' + fmtNum(diff) + ' missing/broken</span>';
+        else if(diff < 0) statusHtml = '<span class="status-warn">+' + fmtNum(-diff) + ' extra — recount</span>';
+        else statusHtml = '<span class="status-ok">All accounted for</span>';
+      }
+      return '<tr>' +
+        '<td>' + esc(item.name) + '</td>' +
+        '<td>' + item.code + '</td>' +
+        '<td>' + fmtNum(expected) + '</td>' +
+        '<td>' + (rec ? fmtNum(rec.qty) : "—") + '</td>' +
+        '<td>' + (rec ? rec.date : "—") + '</td>' +
+        '<td>' + statusHtml + '</td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  /* ---------------- Month-end ---------------- */
+  const monthPicker = document.getElementById("monthPicker");
+  monthPicker.value = thisMonthStr();
+  monthPicker.addEventListener("change", renderMonthEnd);
+
+  function buildMonthReport(monthStr){
+    const [start,end] = monthRange(monthStr);
+    return state.items.map(function(item){
+      const opening = item.openingQty;
+      const purchased = purchasedBetween(item.id, item.openingDate, end);
+      const expected = Number(opening) + purchased;
+      const rec = latestCountUpTo(item.id, end);
+      const lastCount = rec ? rec.qty : null;
+      const countedThisMonth = rec && rec.date >= start && rec.date <= end;
+      const shortage = lastCount !== null ? expected - lastCount : null;
+      return {
+        itemId: item.id, name: item.name, code: item.code,
+        opening: opening, purchased: purchased, expected: expected,
+        lastCount: lastCount, countDate: rec ? rec.date : null,
+        countedThisMonth: countedThisMonth, shortage: shortage
+      };
+    });
+  }
+
+  function renderMonthEnd(){
+    const body = document.getElementById("monthBody");
+    if(state.items.length === 0){
+      body.innerHTML = '<tr><td colspan="6" class="empty">Add items in Setup first.</td></tr>';
+      renderClosureHistory();
+      return;
+    }
+    const report = buildMonthReport(monthPicker.value);
+    body.innerHTML = report.map(function(r){
+      let shortageHtml;
+      if(r.shortage === null){
+        shortageHtml = '<span class="status-none">No count recorded</span>';
+      }else if(r.shortage > 0){
+        shortageHtml = '<span class="status-bad">' + fmtNum(r.shortage) + '</span>';
+      }else if(r.shortage < 0){
+        shortageHtml = '<span class="status-warn">+' + fmtNum(-r.shortage) + '</span>';
+      }else{
+        shortageHtml = '<span class="status-ok">0</span>';
+      }
+      const staleFlag = (r.lastCount !== null && !r.countedThisMonth) ? ' <span class="status-warn" style="font-size:10px;">(old count, ' + r.countDate + ')</span>' : '';
+      return '<tr>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td>' + fmtNum(r.opening) + '</td>' +
+        '<td>+' + fmtNum(r.purchased) + '</td>' +
+        '<td>' + fmtNum(r.expected) + '</td>' +
+        '<td>' + (r.lastCount !== null ? fmtNum(r.lastCount) : "—") + staleFlag + '</td>' +
+        '<td>' + shortageHtml + '</td>' +
+      '</tr>';
+    }).join("");
+    renderClosureHistory();
+  }
+
+  document.getElementById("exportCsv").addEventListener("click", function(){
+    if(state.items.length === 0) return;
+    const month = monthPicker.value;
+    const report = buildMonthReport(month);
+    const rows = [["Item","Code","Opening","Purchased","Expected","Last Count","Count Date","Shortage"]];
+    report.forEach(function(r){
+      rows.push([r.name, r.code, r.opening, r.purchased, r.expected,
+        r.lastCount === null ? "" : r.lastCount, r.countDate || "", r.shortage === null ? "" : r.shortage]);
+    });
+    const csv = rows.map(function(row){
+      return row.map(function(cell){
+        const s = String(cell).replace(/"/g,'""');
+        return /[",\n]/.test(s) ? '"' + s + '"' : s;
+      }).join(",");
+    }).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "meet-and-eat-shortage-" + month + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  document.getElementById("closeMonthBtn").addEventListener("click", function(){
+    if(state.items.length === 0) return;
+    const month = monthPicker.value;
+    const report = buildMonthReport(month);
+    const uncounted = report.filter(r => r.lastCount === null).length;
+    let warnMsg = 'Close ' + month + ' and reset baselines to the latest counts?';
+    if(uncounted > 0) warnMsg += '\n\n' + uncounted + ' item(s) have no count yet — those will carry over unchanged, not written off.';
+    warnMsg += '\n\nThis cannot be undone from inside the app.';
+    if(!confirm(warnMsg)) return;
+
+    const [, end] = monthRange(month);
+    const nextOpeningDate = nextDay(end);
+    report.forEach(function(r){
+      const item = getItem(r.itemId);
+      if(!item) return;
+      if(r.lastCount !== null){
+        item.openingQty = r.lastCount;
+        item.openingDate = nextOpeningDate;
+      }
+      // if never counted, leave opening/openingDate untouched — nothing to write off
+    });
+    state.closures.push({
+      id: uid(), month: month, closedAt: todayStr(),
+      items: report
+    });
+    persist();
+    renderAll();
+    alert("Month " + month + " closed. Baselines reset for counted items.");
+  });
+
+  function renderClosureHistory(){
+    const list = document.getElementById("closureHistory");
+    if(state.closures.length === 0){
+      list.innerHTML = '<li class="empty" style="background:none;padding:0;">No months closed yet.</li>';
+      return;
+    }
+    const sorted = state.closures.slice().sort(function(a,b){ return a.month < b.month ? 1 : -1; });
+    list.innerHTML = sorted.map(function(c){
+      const totalShortage = c.items.reduce(function(s,i){ return s + (i.shortage && i.shortage > 0 ? i.shortage : 0); }, 0);
+      return '<li><strong>' + c.month + '</strong> — closed ' + c.closedAt + ' · total shortage written off: ' + fmtNum(totalShortage) + ' units across ' + c.items.length + ' item(s)</li>';
+    }).join("");
+  }
+
+  /* ---------------- Reset ---------------- */
+  document.getElementById("resetAll").addEventListener("click", function(){
+    if(!confirm("Erase everything — items, counts, purchases, closures, logo? This cannot be undone.")) return;
+    state = defaultState();
+    persist();
+    location.reload();
+  });
+
+  /* ---------------- Init ---------------- */
+  function renderAll(){
+    renderLogo();
+    renderItemsList();
+    renderRestockItemOptions();
+    // Refresh whichever tab is visible so numbers stay honest
+    const activeTab = document.querySelector(".tab.active");
+    if(activeTab){
+      const t = activeTab.dataset.tab;
+      if(t === "nightly") renderNightly();
+      if(t === "restock") renderRestock();
+      if(t === "dashboard") renderDashboard();
+      if(t === "monthend") renderMonthEnd();
+    }
+  }
+  renderAll();
+})();
+</script>
+</body>
+</html>
