@@ -1,2 +1,0 @@
-# Meet-Eat
-Stock management. 
